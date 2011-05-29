@@ -28,15 +28,7 @@ slchar::slchar(char c) {
 	prev = NULL;
 }
 
-void slchar::setNext(slchar* newNext) {
-	next = newNext;
-}
-
-void slchar::setPrev(slchar* newPrev) {
-	prev = newPrev;
-}
-
-void slchar::setChar(char c) {
+void slchar::set(char c) {
 	schar = c;
 }
 
@@ -44,54 +36,92 @@ char slchar::get() const {
 	return schar;
 }
 
-const slchar* slchar::getNext() const {
-	return next;
-}
-
-const slchar* slchar::getPrev() const {
-	return prev;
-}
-
 /* slstring definition */
 
 slstring::slstring() {
 	begin = NULL;
 	end = NULL;
+	search = NULL;
 	size = 0;
 	replace = false;
+	reversed = false;
 }
 
 slstring::slstring(const char* baseString) {
+	slstring();
 	long newSize = strlen(baseString);
 	slchar* prevTmp = NULL;
 	for(long i = 0; i < newSize; i++) {
 		slchar* tmp = new slchar(baseString[i]);
 		if(prevTmp == NULL) {
 			begin = tmp;
-			tmp->prev = NULL;
+			setPrev(tmp, NULL);
 		} else {
-			prevTmp->next = tmp;		
-			tmp->prev = prevTmp;
+			setNext(prevTmp, tmp);
+			setPrev(tmp, prevTmp);
 			if(i == newSize - 1) {
-				tmp->next = NULL;
-				end = tmp;
+				setNext(tmp, NULL);
+				setTail(tmp);
 			}
 		}
 		prevTmp = tmp;
 	}
 	size = newSize;
-	replace = false;
+	reversed = false;
 }
 
 slstring::slstring(const string& base) {
 	slstring(base.c_str());
 }
 
-void slstring::append(char c) {
+
+slstring::slstring(const slstring& baseString) {
+	begin = NULL;
+	end = NULL;
+	size = 0;
+	reversed = false;
+	slchar* tmp = baseString.head();
+	while(tmp != NULL) {
+		append(tmp->get());
+		tmp = baseString.next(tmp);
+	}
+}
+
+void slstring::_appendFront(char c) {
+	if(size == 0) {
+		_append(c);
+		return;
+	}
+	slchar* tmp = new slchar(NULL, begin, c);
+	begin->prev = tmp;
+	begin = tmp;
+	++size;
+}
+
+void slstring::appendFront(char c) {
+	if(reversed) {
+		_append(c);
+		return;
+	}
+	_appendFront(c);
+}
+
+void slstring::_append(char c) {
 	slchar* tmp = new slchar(end, NULL, c);
-	end->next = tmp;
+	if(size == 0)
+		begin = tmp;
+	else
+		end->next = tmp;
 	end = tmp;
-	size++;
+	++size;
+}
+
+void slstring::append(char c) {
+	if(reversed) {
+		_appendFront(c);
+		return;
+	}
+	_append(c);
 }
 
 void slstring::append(char* str) {
@@ -100,32 +130,87 @@ void slstring::append(char* str) {
 
 void slstring::append(const char* str) {
 	long length = strlen(str);
-	slchar* tmpPrev = end;
 	for(int i = 0; i < length; i++) {	
-		slchar* tmp = new slchar(tmpPrev, NULL, str[i]);
-		tmpPrev->next = tmp;
-		tmpPrev = tmp;
+		if(reversed)
+			_appendFront(str[i]);
+		else
+			_append(str[i]);
 	}
-	end = tmpPrev;
 	size += length;
 }
 
 slchar* slstring::rewind(long index) const throw(slexception) {
 	if(index > size)
 		throw slexception("Index out of range");
-	slchar* current = begin;
+	slchar* current = head();
 	for(long int i = 0; i < index; i++) {
-		current = current->next;	
+		current = next(current);
 	}
 	return current;
 }
 
-const slchar* slstring::head() const {
-	return begin;
+slchar* slstring::head() const {
+	if(!reversed)
+		return begin;
+	return end;
 }
 
-const slchar* slstring::tail() const {
+slchar* slstring::tail() const {
+	if(!reversed)
+		return end;
 	return end;
+}
+
+slchar* slstring::setHead(slchar* h) {
+	if(!reversed)
+		begin = h;
+	else
+		end = h;
+	return h;
+}
+
+slchar* slstring::setTail(slchar* t) {
+	if(!reversed)
+		end = t;
+	else
+		begin = t;
+	return t;
+}
+
+slchar* slstring::next(const slchar* c) const {
+	if(!reversed)
+		return c->next; 
+	return c->prev;
+}
+
+slchar* slstring::prev(const slchar* c) const {
+	if(!reversed)
+		return c->prev;
+	return c->next;
+}
+
+slchar* slstring::setNext(slchar* source, slchar* destination) {
+	if(!reversed)
+		source->next = destination;
+	else
+		source->prev = destination;
+	return destination;	
+}
+
+slchar* slstring::setPrev(slchar* source, slchar* destination) {
+	if(!reversed)
+		source->prev = destination;
+	else
+		source->next = destination;
+	return destination;
+}
+
+void slstring::reverse() {	
+	reversed = !reversed;
+}
+
+bool slstring::isReversed() const {
+	return reversed;
 }
 
 long slstring::length() const {
@@ -137,13 +222,13 @@ slchar* slstring::remove(slchar* c) {
 }
 
 slchar* slstring::remove(const slchar* c) {
-	slchar* tmp = c->next;
-	if(c == end)
-		end = c->prev;
-	else if(c == begin)
-		begin = c->next;
-	c->next->prev = c->prev;
-	c->prev->next = c->next;
+	slchar* tmp = next(c);
+	if(c == tail())
+		setTail(prev(c));
+	else if(c == head())
+		setHead(next(c));
+	setPrev(next(c), prev(c));
+	setNext(prev(c), next(c));
 	delete c;
 	--size;
 	return tmp;
@@ -154,7 +239,7 @@ slchar* slstring::getChar(const char c, long from) const throw(slexception) {
 	while(current != NULL) {
 		if(current->get() == c)
 			return current;
-		current = current->next;
+		current = next(current);
 	}
 	return NULL;
 }
@@ -169,7 +254,7 @@ long slstring::getCharPosition(const char c, long from) const throw(slexception)
 		if(current->get() == c) 
 			return from;
 		from++;
-		current = current->next;
+		current = next(current);
 	}
 	return -1;
 }
@@ -184,12 +269,20 @@ char slstring::operator[](unsigned long index) const throw(slexception) {
 	return tmp->get();
 }
 
+long slstring::operator()(const char c) const {
+	return getCharPosition(c);
+}
+
+long slstring::operator()(const char c, long start) const {
+	return getCharPosition(c, start);
+}
+
 slstring& slstring::operator+=(const char* str) {
 	append(str);
 }
 
 slstring& slstring::operator+=(char* str) {
-	append(str);
+	append((const char*)str);
 }
 
 slstring& slstring::operator+=(char c) {
@@ -197,12 +290,18 @@ slstring& slstring::operator+=(char c) {
 }
 
 slstring& slstring::operator--() {
-	slchar* tmp = end->prev;
-	tmp->next = NULL;
+	slchar* tmp = prev(end);
+	setNext(tmp, NULL);
 	delete end;
-	end = tmp;
+	setTail(tmp);
 	--size;
 	return *this;
+}
+
+slstring slstring::operator--(int x) {
+	slstring tmp = *this;
+	this->operator--();
+	return tmp;
 }
 
 slstring& slstring::operator-=(long count) {
@@ -215,12 +314,12 @@ slstring& slstring::operator-=(long count) {
 }
 
 slstring& slstring::operator-=(char del) {
-	slchar* current = begin;
+	slchar* current = head();;
 	while(current != NULL) {
 		if(current->get() == del)
 			current = this->remove(current);
 		else
-			current = current->next;
+			current = next(current);
 	}
 	return *this;
 }
@@ -232,7 +331,7 @@ slstring& slstring::operator-=(char* sequence) {
 
 slstring& slstring::operator-=(const char* sequence) {
 	long seqLen = strlen(sequence);
-	slchar* current = begin;
+	slchar* current = head();
 	while(current != NULL) {
 		bool found = false;
 		for(long i = 0; i < seqLen; i++) {
@@ -243,7 +342,7 @@ slstring& slstring::operator-=(const char* sequence) {
 			}
 		}
 		if(!found && current != NULL)
-			current = current->next;
+			current = next(current);
 	}
 	return *this;
 }
@@ -258,7 +357,7 @@ ostream& operator<<(ostream& out, const skorpion9312::slstring* str) {
 	const slchar* current = str->head();
 	while(current != NULL) {
 		out << current->get();
-		current = current->getNext();
+		current = str->next(current);
 	}
 	return out;
 }
