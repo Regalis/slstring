@@ -18,7 +18,29 @@ Examples
 		hello += " abc";
 		cout << hello << endl;
 		hello.appendFront("Front ");
-		long pos = hello.getCharPosition('e');
+		size_t pos = hello.getCharPosition('e');
+
+		/* Tokenizer example */
+		slstring str = "a b c def gh ij";
+		str.setSeparators(" "); /* "explode" string with " " */
+		slstring token;
+		while(!token.isLastToken()) {
+			str >> token; /* get next token */
+			cout << token << endl;
+		}
+
+		/* Reversed tokenizer */
+		slstring str1 = "a b c def gh ij";
+		str1.setSeparators(" ");
+		str1.reverse(); /* reverse string */
+		slstring token1;
+		while(!token1.isLastToken()) {
+			str1 >> token1;
+			token1.reverse(); /* reverse token (because str1 is reversed) */
+			cout << token1 << endl;
+		}
+		str1.reverse(); /* back to previous order */
+
 	}
 	(...)
 
