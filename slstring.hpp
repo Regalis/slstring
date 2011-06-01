@@ -55,10 +55,15 @@ namespace skorpion9312 {
 		private:
 			slchar* begin;
 			slchar* end;
+			slchar* separatorStart;
+			slchar* separatorEnd;
 			char* search;
-			long size;
+			char* separators;
+			size_t separatorsLength;
+			size_t size;
 			bool replace;
 			bool reversed;
+			bool lastToken;
 
 			void _appendFront(char c);
 			void _append(char c);
@@ -77,32 +82,38 @@ namespace skorpion9312 {
 			slchar* tail() const;
 			slchar* setHead(slchar* h);
 			slchar* setTail(slchar* t);
+			void setLastToken(bool t);
+			bool isLastToken() const;
 			void appendFront(char c);
 			void append(char c);
 			void append(char* str);
 			void append(const char* str);
 			void reverse();
 			bool isReversed() const;
-			long length() const;
+			size_t length() const;
+			void setSeparators(const char* separators);
+			void setSeparators(char* separators);
 			slchar* remove(slchar* c);
 			slchar* remove(const slchar* c);
-			slchar* rewind(long number) const throw(slexception);
+			slchar* rewind(size_t number) const throw(slexception);
 			slchar* getChar(const char c) const throw(slexception);
-			slchar* getChar(const char c, long from) const throw(slexception);
-			long getCharPosition(const char c) const throw(slexception);
-			long getCharPosition(const char c, long start) const throw(slexception);
-			char operator[](unsigned long index) const throw(slexception);
-			long operator()(const char c) const;
-			long operator()(const char c, long start) const;
+			slchar* getChar(const char c, size_t start) const throw(slexception);
+			slchar* getChar(const char c, slchar* start) const;
+			size_t getCharPosition(const char c) const throw(slexception);
+			size_t getCharPosition(const char c, size_t start) const throw(slexception);
+			char operator[](size_t index) const throw(slexception);
+			size_t operator()(const char c) const;
+			size_t operator()(const char c, size_t start) const;
 			slstring& operator+=(const char* str);
 			slstring& operator+=(char* str);
 			slstring& operator+=(char c);
 			slstring& operator--();
 			slstring operator--(int);
-			slstring& operator-=(long count);
+			slstring& operator-=(size_t count);
 			slstring& operator-=(char del);
 			slstring& operator-=(const char* sequence);
 			slstring& operator-=(char* sequence);
+			slstring& operator>>(slstring& out);
 	};
 
 }

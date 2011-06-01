@@ -61,16 +61,21 @@ slstring::slstring() {
 	begin = NULL;
 	end = NULL;
 	search = NULL;
+	separators = NULL;
+	separatorStart = NULL;
+	separatorEnd = NULL;
+	separatorsLength = 0;
 	size = 0;
 	replace = false;
 	reversed = false;
+	lastToken = false;
 }
 
 slstring::slstring(const char* baseString) {
 	slstring();
-	long newSize = strlen(baseString);
+	size_t newSize = strlen(baseString);
 	slchar* prevTmp = NULL;
-	for(long i = 0; i < newSize; i++) {
+	for(size_t i = 0; i < newSize; i++) {
 		slchar* tmp = new slchar(baseString[i]);
 		if(prevTmp == NULL) {
 			begin = tmp;
@@ -87,6 +92,10 @@ slstring::slstring(const char* baseString) {
 	}
 	size = newSize;
 	reversed = false;
+	separators = NULL;
+	lastToken = false;
+	separatorStart = NULL;
+	separatorEnd = NULL;
 }
 
 slstring::slstring(const string& base) {
@@ -97,13 +106,25 @@ slstring::slstring(const string& base) {
 slstring::slstring(const slstring& baseString) {
 	begin = NULL;
 	end = NULL;
+	separators = NULL;
+	separatorStart = NULL;
+	separatorEnd = NULL;
 	size = 0;
 	reversed = false;
+	lastToken = false;
 	slchar* tmp = baseString.head();
 	while(tmp != NULL) {
 		append(tmp->get());
 		tmp = baseString.next(tmp);
 	}
+}
+
+void slstring::setLastToken(bool t) {
+	lastToken = t;
+}
+
+bool slstring::isLastToken() const {
+	return lastToken;
 }
 
 void slstring::_appendFront(char c) {
@@ -148,7 +169,7 @@ void slstring::append(char* str) {
 }
 
 void slstring::append(const char* str) {
-	long length = strlen(str);
+	size_t length = strlen(str);
 	for(int i = 0; i < length; i++) {	
 		if(reversed)
 			_appendFront(str[i]);
@@ -158,11 +179,11 @@ void slstring::append(const char* str) {
 	size += length;
 }
 
-slchar* slstring::rewind(long index) const throw(slexception) {
+slchar* slstring::rewind(size_t index) const throw(slexception) {
 	if(index > size)
 		throw slexception("Index out of range");
 	slchar* current = head();
-	for(long int i = 0; i < index; i++) {
+	for(size_t i = 0; i < index; i++) {
 		current = next(current);
 	}
 	return current;
@@ -232,8 +253,22 @@ bool slstring::isReversed() const {
 	return reversed;
 }
 
-long slstring::length() const {
+size_t slstring::length() const {
 	return size;
+}
+
+void slstring::setSeparators(const char* s) {
+	if(separators != NULL)
+		delete separators;
+	size_t length = strlen(s);
+	separators = new char[length];
+	strcpy(separators, s);
+	separatorsLength = length;
+	separatorStart = NULL;
+}
+
+void slstring::setSeparators(char* s) {
+	setSeparators((const char*)s);
 }
 
 slchar* slstring::remove(slchar* c) {
@@ -253,8 +288,8 @@ slchar* slstring::remove(const slchar* c) {
 	return tmp;
 }
 
-slchar* slstring::getChar(const char c, long from) const throw(slexception) {
-	slchar* current = rewind(from);
+slchar* slstring::getChar(const char c, slchar* start) const {
+	slchar* current = start;
 	while(current != NULL) {
 		if(current->get() == c)
 			return current;
@@ -263,36 +298,41 @@ slchar* slstring::getChar(const char c, long from) const throw(slexception) {
 	return NULL;
 }
 
-slchar* slstring::getChar(const char c) const throw(slexception) {
-	return getChar(c, 0);
+slchar* slstring::getChar(const char c, size_t start) const throw(slexception) {
+	slchar* current = rewind(start);
+	return getChar(c, current);
 }
 
-long slstring::getCharPosition(const char c, long from) const throw(slexception) {
-	slchar* current = rewind(from);
+slchar* slstring::getChar(const char c) const throw(slexception) {
+	return getChar(c, head());
+}
+
+size_t slstring::getCharPosition(const char c, size_t start) const throw(slexception) {
+	slchar* current = rewind(start);
 	while(current != NULL) {
 		if(current->get() == c) 
-			return from;
-		from++;
+			return start;
+		++start;
 		current = next(current);
 	}
 	return -1;
 }
 
-long slstring::getCharPosition(const char c) const throw(slexception) { 
+size_t slstring::getCharPosition(const char c) const throw(slexception) { 
 	return getCharPosition(c, 0);
 }
 
 
-char slstring::operator[](unsigned long index) const throw(slexception) {
+char slstring::operator[](size_t index) const throw(slexception) {
 	slchar* tmp = rewind(index);	
 	return tmp->get();
 }
 
-long slstring::operator()(const char c) const {
+size_t slstring::operator()(const char c) const {
 	return getCharPosition(c);
 }
 
-long slstring::operator()(const char c, long start) const {
+size_t slstring::operator()(const char c, size_t start) const {
 	return getCharPosition(c, start);
 }
 
@@ -323,10 +363,10 @@ slstring slstring::operator--(int x) {
 	return tmp;
 }
 
-slstring& slstring::operator-=(long count) {
+slstring& slstring::operator-=(size_t count) {
 	if(count > size)
 		count = size;
-	for(long i = 0; i < count; i++) {
+	for(size_t i = 0; i < count; i++) {
 		--(*this);
 	}
 	return *this;
@@ -349,11 +389,11 @@ slstring& slstring::operator-=(char* sequence) {
 
 
 slstring& slstring::operator-=(const char* sequence) {
-	long seqLen = strlen(sequence);
+	size_t seqLen = strlen(sequence);
 	slchar* current = head();
 	while(current != NULL) {
 		bool found = false;
-		for(long i = 0; i < seqLen; i++) {
+		for(size_t i = 0; i < seqLen; i++) {
 			if(current->get() == sequence[i]) {
 				current = this->remove(current);
 				found = true;
@@ -362,6 +402,35 @@ slstring& slstring::operator-=(const char* sequence) {
 		}
 		if(!found && current != NULL)
 			current = next(current);
+	}
+	return *this;
+}
+
+slstring& slstring::operator>>(slstring& out) {
+	if(separatorStart == NULL)
+		separatorStart = head();
+	for(size_t i = 0; i < separatorsLength; ++i) {
+		// Temporary...
+		// TODO: rewrite this for
+		separatorEnd = getChar(separators[i], separatorStart);
+		if(separatorEnd != NULL) {
+			break;
+		}
+	}
+	out = "";
+	if(separatorEnd == NULL) {
+		out.setLastToken(true);
+	}
+	slchar* current = separatorStart;
+	while(current != separatorEnd) {
+		out += current->get();
+		current = next(current);
+	}
+	if(out.isLastToken()) {
+		separatorStart = NULL;
+		separatorEnd = NULL;
+	} else {
+		separatorStart = next(separatorEnd);
 	}
 	return *this;
 }
